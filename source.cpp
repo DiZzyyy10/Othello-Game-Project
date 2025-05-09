@@ -69,6 +69,7 @@ void output()
 	printf("   a  b  c  d  e  f  g  h \n");
 	for (x = 1; x <= SIDE; x++)
 		printf("%s|", piece[board[getposition(x, y)]]);//‚¿‚å‚Á‚ÆŠÈŒ‰‚É‘‚­‚½‚ß‚Ìƒqƒ“ƒg
+
 }
 
 // ÀÛ‚Éè‚ği‚ß‚é
@@ -97,7 +98,12 @@ Move manplayer()
 	} while (line[0] < 'a' || line[0] > 'h');
 	x = line[0] - 'a' + 1;
 	// input Y coordinate
-	©•ª‚Å‘‚±‚¤
+	do
+	{
+		printf("y(1-8):");
+		fgets(line, 256, stdin);
+	} while (line[0] < '1' || line[0] > '8');
+	y = line[0] - '1' + 1;
 
 		// Check legal move
 		move = getposition(x, y);
