@@ -35,7 +35,7 @@
 #define TRUE 1
 #define FALSE 0
 //表示に使う文字定数
-const char* piece[3] = { "  ", "●", "○" };
+const char* piece[3] = { "  ", "黒", "〇" };
 const char* abc[8] = { "a","b","c","d","e","f","g","h" };
 int turn; // 手番
 int ply; //手数 
@@ -67,9 +67,15 @@ void output()
 {//ヒントを参考に、とにかく表示する関数を作りましょう
 	int x, y = 0;
 	printf("   a  b  c  d  e  f  g  h \n");
-	for (x = 1; x <= SIDE; x++)
-		printf("%s|", piece[board[getposition(x, y)]]);//ちょっと簡潔に書くためのヒント
-
+	for (y = 1; y <= SIDE; y++)
+	{
+		printf("%d", y);
+		for (x = 1; x <= SIDE; x++)
+		{
+			printf("%s|", piece[board[getposition(x, y)]]);//ちょっと簡潔に書くためのヒント
+		}
+		printf("\n");
+	}
 }
 
 // 実際に手を進める
