@@ -167,7 +167,7 @@ int isLegalMove(Move pos)
 			//‚¾‚ß‚È‚ç continue
 
 			//‚Ü‚¸‘Šè‚ÌÎ‚ª‚ ‚é‚©’²‚×‚é
-			if (board[nextToPos] != opponentcolor || board[nextToPos] == Move(N))
+			if (board[nextToPos] != opponentcolor || board[nextToPos] == N)
 				continue;
 			do // ‘Šè‚ÌÎ‚ª‚ ‚éŠÔ‚ÍŸ‚ğ’²‚×‚é
 			{
@@ -258,7 +258,7 @@ void makeMove(Move pos)
 			//‚¾‚ß‚È‚ç continue
 
 			//‚Ü‚¸‘Šè‚ÌÎ‚ª‚ ‚é‚©’²‚×‚é
-			if (board[nextToPos] != opponentcolor || board[nextToPos] == Move(N))
+			if (board[nextToPos] != opponentcolor || board[nextToPos] == N)
 				continue;
 			do // ‘Šè‚ÌÎ‚ª‚ ‚éŠÔ‚ÍŸ‚ğ’²‚×‚é
 			{
@@ -389,7 +389,7 @@ int main()
 	int manturn = BLACK_TURN;
 	char line[256];
 
-	srand(time(NULL));
+	srand((unsigned int)time(NULL));
 	init();
 	output();//‹Ç–Ê‚Ì•\¦
 	
