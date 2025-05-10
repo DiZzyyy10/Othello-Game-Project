@@ -121,7 +121,7 @@ void main()
 {
 	//まずは変数宣言、初期化など
 	output();//局面の表示
-	//	while(1)//一回の対局が終わるまでループ
+	while(1)//一回の対局が終わるまでループ
 	{
 		nextmove = manplayer();
 		makemove(nextmove);//一手進める関数
