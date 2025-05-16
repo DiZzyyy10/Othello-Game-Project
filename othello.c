@@ -1,16 +1,14 @@
 /*******************************************************************
 
-	オセロ プログラム　ヒント１　　　　Othello1.c
+	オセロ プログラム　　　　　Othello.c
 
 	松江工業高等専門学校　情報工学科　准教授　橋本　剛
-	ゲームプログラミング　授業用
+	プログラミング　授業用
 
-	まずは空いてるマスにとりあえず置くプログラムから、徐々に
-	ルールを記述していく
 *******************************************************************/
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
+#include <memory.h>//memcpy
 
 #define SIDE 8 // 一辺の長さ 
 #define ASIDE (SIDE + 2) // 局面用配列の一辺 緩衝地帯分２を足す Side for array, add 2
@@ -26,37 +24,67 @@
 #define BLACK_TURN 0 
 #define WHITE_TURN 1
 
-
 //座標からX座標またはY座標を計算するマクロ
 #define X(pos) (pos % ASIDE)
 #define Y(pos) (pos / ASIDE)
-
 #define TURNCOLOR( turn ) (turn + 1)
 #define OPPONENT(turn) !turn
 
 #define TRUE 1
 #define FALSE 0
 
-// from hint2
-#define PASSMOVE 99 //パス手には99を入れる 
 #define MOVENUM 32
+#define PASSMOVE 99 //パス手には99を入れる 
+
+///////////////////////////AI用に追加　ここから
+#define MAXDEPTH 5 //探索を行う最大深さ
+#define INFINITY 1000 //十分大きい数を無限大として扱う
+#define SEARCH_LIMIT_DEPTH 128 //探索深さの上限
+///////////////////////////AI用に追加　ここまで
 
 //表示に使う文字定数
-const char* piece[3] = { "  ", "黒", "〇" };
+const char* piece[3] = { "  ", "●", "○" };
 const char* abc[8] = { "a","b","c","d","e","f","g","h" };
 int turn; // 手番
 int ply; //手数 
 
-typedef unsigned char Move;//手だとわかりやすくするため型を宣言（しなくてもよい）
+typedef char Move;//手だとわかりやすくするため型を宣言（しなくてもよい）
 Move nextmove;//次の手 
 unsigned char stonenum[2];//石の数を記憶する変数
 
+///////////////////////////AI用に追加　ここから
+struct Position //過去の局面などを記憶するための構造体
+{
+	unsigned char board[BOARDSIZE];
+	unsigned char stonenum[2];
+};
+struct Position history[SEARCH_LIMIT_DEPTH];
+//場所による評価を与える配列
+//角が良いことを教えることが一番の目的
+//本当はパターンによる評価が出来ればよいが、
+//この程度でもそれっぽくすることは可能
+int evalboard[BOARDSIZE] =
+{
+	0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+	0,  99,  99,  99,  99,  99,  99,  99,  99,   0,
+	0,  99, -15, -15, -15, -15, -15, -15,  99,   0,
+	0,  99, -15,  20,  20,  20,  20, -15,  99,   0,
+	0,  99, -15,  20,   4,   4,  20, -15,  99,   0,
+	0,  99, -15,  20,   4,   4,  20, -15,  99,   0,
+	0,  99, -15,  20,  20,  20,  20, -15,  99,   0,
+	0,  99, -15, -15, -15, -15, -15, -15,  99,   0,
+	0,  99,  99,  99,  99,  99,  99,  99,  99,   0,
+	0,   0,   0,   0,   0,   0,   0,   0,   0,   0
+};
+///////////////////////////AI用に追加　ここまで
+
+//check this again<-------------------------------------------
+
 //2次元の座標を一次元に変換
 int getposition(int x, int y) { return y * ASIDE + x; };
-
 //一番大事な変数、ここでは一次元で表現
 unsigned char board[BOARDSIZE] = //intでも良いが、データ格納のことを考えてcharにしている
-{//とりあえずはこんな感じで初期化
+{
 	N, N, N, N, N, N, N, N, N, N,
 	N, 0, 0, 0, 0, 0, 0, 0, 0, N,
 	N, 0, 0, 0, 0, 0, 0, 0, 0, N,
@@ -68,125 +96,71 @@ unsigned char board[BOARDSIZE] = //intでも良いが、データ格納のことを考えてcharに
 	N, 0, 0, 0, 0, 0, 0, 0, 0, N,
 	N, N, N, N, N, N, N, N, N, N
 };
-
-
-int isLegalMove(Move pos);
-
-
 // 表示関数 display function
 void output()
-{//ヒントを参考に、とにかく表示する関数を作りましょう
-	int x, y = 0;
-	printf("  a  b  c  d  e  f  g  h \n");
+{//とにかく表示する関数を作りましょう
+	int x, y;
+	printf("   a  b  c  d  e  f  g  h \n");
 	for (y = 1; y <= SIDE; y++)
 	{
-		printf("%d", y);
+		printf("%d |", y);
 		for (x = 1; x <= SIDE; x++)
-		{
 			printf("%s|", piece[board[getposition(x, y)]]);//ちょっと簡潔に書くためのヒント
-		}
 		printf("\n");
 	}
-}
-
-// 実際に手を進める
-void makemove(Move pos)
-{
-	//とりあえず、指定された場所に石を置く
-	int color = TURNCOLOR(turn);
-	board[pos] = color;
-	//手番交代
-	turn = OPPONENT(turn);//0→1、1→0となる
-}
-
-//人間の入力を管理する関数
-Move manplayer()
-{
-	//入力をさせ、合法手かチェック
-	//とりあえず最初は石がないところにどこでも置けるから始める
-
-	char line[256];
-	int x, y, move;
-	do
+	// デバッグ用表示
+/*	printf( "   a  b  c  d  e  f  g  h \n" );
+	for ( y = 1; y <= SIDE; y++ )
 	{
-		// input X coordinate
-		do
-		{
-			printf("x(a-h):");
-			fgets(line, 256, stdin);
-		} while (line[0] < 'a' || line[0] > 'h');
-		x = line[0] - 'a' + 1;
-		// input Y coordinate
-		do
-		{
-			printf("y(1-8):");
-			fgets(line, 256, stdin);
-		} while (line[0] < '1' || line[0] > '8');
-		y = line[0] - '1' + 1;
-
-			// Check legal move
-		move = getposition(x, y);
-
-	} while (!isLegalMove(move));
-	
-	
-
-	return (Move)move;
+		printf( "%d |", y );
+		for ( x = 1; x <= SIDE; x++ )
+			printf( "%d|", getposition( x, y ));
+		printf( "\n" );
+	}
+*/
 }
-
-
 
 // 合法手かどうか判定する関数 
 // 合法手ならTRUE、違ったらFALSEを返す
 int isLegalMove(Move pos)
 {
 	int dirx, diry, dir;
-	int nextToPos;
-
+	int pos1;
 	// 自分の色、相手の色は何か変数に入れておく
 	int color = TURNCOLOR(turn);
 	int opponentcolor = TURNCOLOR(OPPONENT(turn));
 
-	//空きマスでないかCheck
-	if (board[pos] != 0)
+	if (board[pos] != 0)//空きマスでないか
 		return FALSE;
 
 	// posの周り8方向を調べ相手石が取れるか調べる
+	// 8方向ループの書き方1
 	for (dirx = -1; dirx <= 1; dirx++)
 	{
 		for (diry = -ASIDE; diry <= ASIDE; diry += ASIDE)
 		{
 			dir = dirx + diry;
-			if (dir == 0)//方向０は意味ないのでパス
+			if (dir == 0)
 				continue;
-			nextToPos = pos + dir;//posの隣のマス
-			if (nextToPos < 0 || nextToPos >= BOARDSIZE)
-				continue;
-			//以下は board[nextToPos] の中身をチェックしながら、
-			//nextToPosを +=dirしていく
+			pos1 = pos + dir;//posの隣のマス
+			//以下は board[pos1] の中身をチェックしながら、
+			//pos1を +=dirしていく
 			//だめなら continue
-
-			//まず相手の石があるか調べる
-			if (board[nextToPos] != opponentcolor || board[nextToPos] == N)
+			if (board[pos1] != opponentcolor)//相手の石があるか
 				continue;
 			do // 相手の石がある間は次を調べる
 			{
-				//次の石
-				nextToPos += dir;
-			} while (board[nextToPos] == opponentcolor); 
-			// ひっくり返すためには最後に自分の石がないといけない)
-			if (board[nextToPos] != color)
+				pos1 += dir;
+			} while (board[pos1] == opponentcolor);
+			// ひっくり返すためには最後に自分の石がないといけない
+			if (board[pos1] != color)
 				continue;
-
 			//最後まで来たら成功
 			return TRUE;
 		}
 	}
 	return FALSE;
 }
-
-
-
 
 //手の生成 generation of moves
 //生成した手の数を返している 
@@ -194,132 +168,225 @@ int generateMoves(Move moves[])
 {
 	int num = 0;//生成する合法手の数
 	int pos;
-	int x, y;
 	// 左上から順に石を置き、合法手か調べる
-	for (y = 1; y <= SIDE; y++)//pos を使ってループ
+	for (pos = 11; pos <= 88; pos++)
 	{
-		for (x = 1; x <= SIDE; x++)
-		{
-			pos = getposition(x, y);
-			if (isLegalMove(pos))
-			{
-				moves[num++] = pos;//合法手なら、moves[num]にposを入れる
-			}
-		}
+		if (isLegalMove(pos))
+			moves[num++] = pos;//num番目の配列に
 	}
 	return num;
 }
 
-
 // ゲーム終了局面ならTRUEを返す Return TRUE in case of GAME OVER
 // 生成した手が０の時呼ばれる
-int isTerminalNode()
+int isTerminalNode(int isPass)
 {
-	int numOpponentMoves;
-	Move opponentMoves[MOVENUM];
+	int num;
+	Move moves[MOVENUM];
+	if (!isPass)
+	{
+		num = generateMoves(moves);
+		if (num > 0)
+			return FALSE;
 
+	}
 	turn = OPPONENT(turn);
-		//手を生成して数を見る
-	numOpponentMoves = generateMoves(opponentMoves);
-	
+	num = generateMoves(moves);
 	turn = OPPONENT(turn);
-		if (numOpponentMoves == 0)
-			return TRUE;
+	if (num == 0)
+		return TRUE;
 	return FALSE;
 }
 
-// 実際に手を進める
-void makeMove(Move pos)
+///////////////////////////AI用に追加　ここから
+
+// ゲーム終了局面の評価値を返す 勝ち ∞ 引き分け 0 負け －∞
+int getTerminalValue()
 {
+	//石数の差を計算　自分の石ー相手の石
+	int diff = stonenum[turn] - stonenum[OPPONENT(turn)];
 
-	int dirx, diry, dir;
-	int nextToPos;
-	int flipCounter = 0;//ひっくり返した石の数
+	if (diff > 0)
+		return INFINITY; //勝ち
+	else if (diff == 0)
+		return 0;
+	else
+		return -INFINITY; //負け
 
-	// 自分の色、相手の色は何か変数に入れておく
+	//勝ち、引き分け、負けの値を返す
+		/*INFINITYを使う*/
+}
+
+// 評価関数の計算　Calculation of evaluation function
+int getEvaluationValue()
+{
+	int pos, value, c;
+	
+	//kim's declaration
+	int opValue;
+
+	Move moves[MOVENUM];
+	// 合法手数の差を評価関数とする(自由度)
+	value = generateMoves(moves);//自分の合法手数を足す
+	turn = OPPONENT(turn);
+	opValue = generateMoves(moves);
+	/*相手の合法手数を引く
+		手番を戻す*/
+	turn = OPPONENT(turn);
+
+	value -= opValue;
+
+		value *= 30;//自由度１を30点としておく（適当）
+	for (pos = 11; pos <= 88; pos++)
+	{
+		c = board[pos];
+		if (c == 0)
+			continue;
+		else if (c == TURNCOLOR(turn))
+			value += evalboard[pos];
+		else
+			value -= evalboard[pos];
+	}
+	return value;
+}
+///////////////////////////AI用に追加　ここまで
+
+// 実際に手を進める
+void makeMove(Move pos, int depth)
+{
+	int pos1, dir, dirx, diry, count = 0;
+	int isLegal = TRUE;
 	int color = TURNCOLOR(turn);
 	int opponentcolor = TURNCOLOR(OPPONENT(turn));
 
-	board[pos] = color;//posに自分の色を置く
+	///////////////////////////AI用に追加　ここから
+	// 局面を配列historyに保存
+	memcpy(history[depth].board, board, sizeof(board));// 配列の中身をコピーするのはmemcpy()を使うと簡単
+	memcpy(history[depth].stonenum, stonenum, sizeof(stonenum));
+	///////////////////////////AI用に追加　ここまで
 
-	// posの周り8方向を調べ相手石が取れるか調べる
+	if (pos == PASSMOVE)//パス手の場合
+	{
+		turn = OPPONENT(turn);
+		return;
+	}
+	board[pos] = color;
+
+	// posの周り8方向を調べ相手石をひっくり返す
 	for (dirx = -1; dirx <= 1; dirx++)
 	{
 		for (diry = -ASIDE; diry <= ASIDE; diry += ASIDE)
 		{
 			dir = dirx + diry;
-			if (dir == 0)//方向０は意味ないのでパス
+			if (dir == 0)
 				continue;
-			nextToPos = pos + dir;//posの隣のマス
-			if (nextToPos < 0 || nextToPos >= BOARDSIZE)
-				continue;
-			//以下は board[nextToPos] の中身をチェックしながら、
-			//nextToPosを +=dirしていく
+			pos1 = pos + dir;//posの隣のマス
+			//以下は board[pos1] の中身をチェックしながら、
+			//pos1を +=dirしていく
 			//だめなら continue
-
-			//まず相手の石があるか調べる
-			if (board[nextToPos] != opponentcolor || board[nextToPos] == N)
+			if (board[pos1] != opponentcolor)//相手の石があるか
 				continue;
 			do // 相手の石がある間は次を調べる
 			{
-				//次の石
-				nextToPos += dir;
-			} while (board[nextToPos] == opponentcolor); 
-			// ひっくり返すためには最後に自分の石がないといけない)
-			if (board[nextToPos] != color)
+				pos1 += dir;
+			} while (board[pos1] == opponentcolor);
+			// ひっくり返すためには最後に自分の石がないといけない
+			if (board[pos1] != color)
 				continue;
 
-			//最後まで来たら成功
-			//search until found our own color and stop
-			nextToPos -= dir; 
-			while (board[nextToPos] == opponentcolor)
+			//最後まで来たら成功!実際にひっくり返す
+			pos1 = pos + dir;
+			do // 相手の石がある間ひっくり返す　
 			{
-				board[nextToPos] = color;
-				nextToPos -= dir; 
-
-				flipCounter++;
-			}
+				board[pos1] = color;
+				pos1 += dir;
+				count++;
+			} while (board[pos1] == opponentcolor);
 		}
 	}
-
-	// 合法手であることを確認してから呼び出されるので、
-	//	if ( board[pos] != 0 )//空きマスでないか
-	//  の部分は必要ない。代わりにboard[pos]に石を置く必要あり。
-	// return TRUE;　や return FALSE; も必要ない
-
-	// 最後まで来たら成功!のところから、実際にひっくり返すコードを追加
-	// ひっくり返す時に、ひっくり返した石の数を変数 int count に記憶させる
-
-	// 最後に石の数をグローバル変数stonenum[]に足す（もしくは引く）
-	stonenum[turn] += (flipCounter + 1);
-	stonenum[OPPONENT(turn)] -= flipCounter;
+	stonenum[turn] += count + 1;
+	stonenum[OPPONENT(turn)] -= count;
 	turn = OPPONENT(turn);
 }
 
+///////////////////////////AI用に追加　ここから
+
+// 手を戻す
+void unmakeMove(int depth)
+{
+	// 配列の中身をコピーするのはmemcpy()を使うと簡単
+	// 逆の事をmakeMove()でしないといけない
+	// 局面を配列historyから復元
+	memcpy(board, history[depth].board, sizeof(board));
+	memcpy(stonenum, history[depth].stonenum, sizeof(stonenum));
+	turn = OPPONENT(turn);
+}
+
+// 探索して最も評価の高い手を選ぶ
+int search(int depth)
+{
+	int i;
+	int movenum;//手の数
+	Move moves[MOVENUM];//手を入れる配列 an array of moves
+	int value;
+	int bestvalue = -INFINITY - 1;//まず最小値を入れる
+
+	//手を生成
+	movenum = generateMoves(moves);
+	if (movenum == 0)
+	{
+		if (isTerminalNode(TRUE))// Game Over
+			return getTerminalValue();
+		else // パス
+			moves[movenum++] = PASSMOVE;
+	}
+	for (i = 0; i<movenum; i++)
+	{
+		makeMove(moves[i], depth);//一手進め
+		value = getEvaluationValue();
+			output();//for Debug
+		printf("i = %d, value = %d, move = %d\n", i, value, moves[i]);//for Debug
+		unmakeMove(depth);//一手戻る
+		//最大かどうか調べ、最大ならnextmoveに代入する（スライド参照）
+		if (value > bestvalue)
+		{
+			bestvalue = value;
+			if (depth == 0)
+				nextmove = moves[i];
+		}
+	}
+	return bestvalue;
+}
+
+//COMの手を生成する関数
+void comPlayer()
+{
+	int value;
+	printf("Com Thinking...\n");
+	value = search(0);
+	printf("value = %d\n", value);
+	if (value == INFINITY)
+		printf("Computer Finds Win!!\n");
+}
+
+///////////////////////////AI用に追加　ここまで
 
 //人間の入力を管理する関数
 Move manPlayer()
 {
 	//入力をさせ、合法手かチェック
 	char line[256];
-	int x, y;
-	int num, move;
-
-	//パスのチェック　関数generateMovesが完成したらコメントアウトを外す
-		Move moves[MOVENUM];
-		num = generateMoves( moves );
-		// 合法手が無い場合
-		if(num == 0)
-		{
-			// パスであることを表示する
-			printf("Pass!\n");
-			// 何か入力させる（Enter押すだけなど）
-			printf("Press ENTER\n");
-			fgets(line, 256, stdin);
-			// パス手を返す
-			return PASSMOVE;
-		}
-	
+	int x, y, num, move;
+	Move moves[MOVENUM];
+	num = generateMoves(moves);
+	// 合法手が無い場合
+	if (num == 0)
+	{
+		printf("PASS!\n");
+		printf("Press Enter!\n");
+		fgets(line, 256, stdin);
+		return PASSMOVE;
+	}
 	do
 	{
 		// input X coordinate
@@ -329,18 +396,16 @@ Move manPlayer()
 			fgets(line, 256, stdin);
 		} while (line[0] < 'a' || line[0] > 'h');
 		x = line[0] - 'a' + 1;
-
 		// input Y coordinate
 		do
 		{
 			printf("y(1-8):");
 			fgets(line, 256, stdin);
 		} while (line[0] < '1' || line[0] > '8');
-		y = line[0] - '1' + 1;
-
+		y = line[0] - '0';
 		// Check legal move
 		move = getposition(x, y);
-		if (isLegalMove(move))//合法手なら
+		if (isLegalMove(move))
 		{
 			break;
 		}
@@ -349,25 +414,19 @@ Move manPlayer()
 	return (Move)move;
 }
 
-//ランダムなプレイヤー
-Move randPlayer()
+
+
+// ランダムに手を返すプレイヤ
+//ランダムに手を返す
+Move randplayer()
 {
 	int num;
 	Move moves[MOVENUM];
 	num = generateMoves(moves);
 	printf("RandPlayer\n");
 	if (num == 0)
-	{
 		return PASSMOVE;
-	}
-		
-	else
-	{
-		int tmpIndex = rand() % num;
-		return moves[tmpIndex];
-	}
-		
-
+	return moves[rand() % num];
 }
 
 //グローバル変数などを初期化
@@ -378,25 +437,17 @@ void init()
 	stonenum[BLACK_TURN] = 2;
 	stonenum[WHITE_TURN] = 2;
 }
-
-
 int main()
 {
 	//まずは変数宣言、初期化など
 	int result;
-	int num;
-	Move moves[MOVENUM];
-	int manturn = BLACK_TURN;
 	char line[256];
-
-	srand((unsigned int)time(NULL));
+	int manturn = BLACK_TURN;
 	init();
 	output();//局面の表示
-	
 	while (1)//一回の対局が終わるまでループ
 	{
-		num = generateMoves(moves);
-		if (num == 0 && isTerminalNode())//終局かチェック
+		if (isTerminalNode(FALSE))//終局かチェック
 		{
 			//石の数で勝ち負け判定し表示
 			result = stonenum[BLACK_TURN] - stonenum[WHITE_TURN];//こんな感じで
@@ -405,19 +456,21 @@ int main()
 				printf("GAMEOVER!  DRAW!!\n");
 			else
 				printf("GAMEOVER! %s WIN!!\n", (result > 0 ? "BLACK" : "WHITE"));
-			printf("Press ENTER\n");
-			fgets(line, 256, stdin);
 			return 0;
 		}
 		if (turn == manturn)
 			nextmove = manPlayer();
+		//randplayer();
 		else
-			nextmove = randPlayer();
-		makeMove(nextmove);
+			//nextmove = randPlayer();
+			comPlayer();
+		makeMove(nextmove, 0);
 		ply++;
 		printf("ply = %d\n", ply);
 		output();
 		printf("%s -> %s%d\n\n", (turn != BLACK_TURN ? "BLACK" : "WHITE"), abc[X(nextmove) - 1], Y(nextmove));
 	}
+	printf("Press any key and Enter\n");
+	fgets(line, 256, stdin);
 	return 0;
 }
