@@ -80,8 +80,6 @@ int evalboard[BOARDSIZE] =
 };
 ///////////////////////////AI用に追加　ここまで
 
-//check this again<-------------------------------------------
-
 //2次元の座標を一次元に変換
 int getposition(int x, int y) { return y * ASIDE + x; };
 //一番大事な変数、ここでは一次元で表現
