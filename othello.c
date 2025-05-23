@@ -331,7 +331,14 @@ int search(int depth)
 	int value;
 	int bestvalue = -INFINITY - 1;//まず最小値を入れる
 
-	//手を生成
+
+
+	if (depth >= MAXDEPTH)
+	{
+		return getEvaluationValue();
+	}//手を生成
+
+
 	movenum = generateMoves(moves);
 	if (movenum == 0)
 	{
@@ -343,9 +350,9 @@ int search(int depth)
 	for (i = 0; i<movenum; i++)
 	{
 		makeMove(moves[i], depth);//一手進め
-		value = getEvaluationValue();
-			output();//for Debug
-		printf("i = %d, value = %d, move = %d\n", i, value, moves[i]);//for Debug
+		value = -search(depth+1);
+			//output();//for Debug
+		//printf("i = %d, value = %d, move = %d\n", i, value, moves[i]);//for Debug
 		unmakeMove(depth);//一手戻る
 		//最大かどうか調べ、最大ならnextmoveに代入する（スライド参照）
 		if (value > bestvalue)
