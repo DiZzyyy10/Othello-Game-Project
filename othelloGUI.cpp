@@ -113,7 +113,7 @@ void ShowBoard()
 	int color;
 	int x, y, stone;
 	int ry = 40, rdy = STRFONTSIZE + 5;
-	static int GrHandle = LoadGraph("back.bmp");//”wŒi‰æ‘œ“o˜^ 640x480
+	static int GrHandle = LoadGraph("./game_assets/back.bmp");//”wŒi‰æ‘œ“o˜^ 640x480
 	DrawGraph(0, 0, GrHandle, FALSE);//”wŒi‚ð•`‚­
 	SetFontSize(STRFONTSIZE);
 	DrawBox(sx, sy, ex, ey, GetColor(1, 154, 48), TRUE);//—Î‚Ì”Õ‚ð•`‰æ
