@@ -208,10 +208,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
 		{
 			nextmove = manPlayerGUI();
 			//nextmove = randplayer();
+			PlaySoundFile("./game_assets/putMAN.wav", DX_PLAYTYPE_NORMAL);
 		}
 		else
 		{
 			comPlayer();
+			PlaySoundFile("./game_assets/putCOM.wav", DX_PLAYTYPE_NORMAL);
 		}
 		makeMove(nextmove, 0);
 		if (nextmove == PASSMOVE)
